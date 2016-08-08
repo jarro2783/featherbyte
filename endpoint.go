@@ -17,6 +17,15 @@ type ReadData interface {
     Data(messageType byte, data []byte)
 }
 
+const (
+    hello byte = 0
+    ok byte = iota
+    closing byte = iota
+    shortBytes byte = iota
+    longBytes byte = iota
+    UserMessageStart byte = iota
+)
+
 func Listen(
     protocol string,
     address string,
@@ -70,8 +79,8 @@ func (ep *Endpoint) readRoutine(read ReadData) {
         }
         fmt.Printf("Read %d bytes\n", n)
         switch data[0] {
-            case 42:
-                data[0] = 1
+            case hello:
+                data[0] = ok
                 conn.Write(data[0:1])
             default:
                 read.Data(data[0], data[1:n])
@@ -114,7 +123,7 @@ func (ep *Endpoint) hello() error {
     conn := ep.connection
 
     fmt.Printf("Writing hello\n")
-    data := [1]byte{42}
+    data := [1]byte{hello}
 
     conn.SetDeadline(time.Now().Add(time.Second * 5))
     _, err := conn.Write(data[:])
@@ -124,13 +133,13 @@ func (ep *Endpoint) hello() error {
         return err
     }
 
-    _, err = conn.Read(data[:])
+    _, err = conn.Read(data[0:1])
 
     if err != nil {
         return err
     }
 
-    if data[0] == 1 {
+    if data[0] == ok {
         ep.isConnected = true
     }
 
@@ -139,4 +148,14 @@ func (ep *Endpoint) hello() error {
 
 func (ep* Endpoint) Connected() bool {
     return ep.isConnected
+}
+
+func (ep* Endpoint) Close() {
+    ep.connection.Close()
+}
+
+func (ep* Endpoint) WriteBytes(data []byte) {
+}
+
+func (ep* Endpoint) WriteMessage(messageType byte, data []byte) {
 }
