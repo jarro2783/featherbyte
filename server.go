@@ -17,14 +17,6 @@ func NewServer(protocol string, address string) *Server {
     return server
 }
 
-func (server *Server) Listen() error {
-    listener, err := net.Listen(server.protocol, server.address)
-
-    server.listener = listener
-
-    return err
-}
-
 func (server *Server) Accept() error {
     conn, err := server.listener.Accept()
 

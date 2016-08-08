@@ -1,8 +1,9 @@
 package featherbyte_test
 
 import fb "github.com/jarro2783/featherbyte"
-import "testing"
 import "fmt"
+import "testing"
+import "time"
 
 // The protocol is simple, each packet consists of a single byte indicating
 // the type of the packet, along with the data for that packet.
@@ -14,33 +15,40 @@ import "fmt"
 
 // The handshake is a Hello with an OK reply.
 
+type handler struct {
+}
+
+func (h *handler) Connection(ep *fb.Endpoint) {
+    fmt.Printf("Started handler\n")
+}
+
+type reader struct {
+}
+
+func (r *reader) Data(messageType byte, data []byte) {
+    fmt.Printf("Got message: %d\n", messageType)
+}
+
 func TestHello(t *testing.T) {
     port := 35123
     address := fmt.Sprintf("%s:%d", "localhost", port)
-    server := fb.NewServer("tcp", address)
-    client := fb.NewClient("tcp", address)
 
-    var err error
+    go func () {
+        fmt.Printf("Starting server\n")
+        fb.Listen("tcp", address, new(handler), new(reader))
+    }()
 
-    err = server.Listen()
+    time.Sleep(time.Millisecond * 100)
 
-    if err != nil {
-        fmt.Printf("Unable to listen\n")
-        t.FailNow()
-    }
-
-    go func (s *fb.Server) {
-        s.Accept()
-    }(server)
-
-    err = client.Connect()
+    fmt.Printf("Connecting\n")
+    ep, err := fb.Connect("tcp", address, new(reader))
 
     if err != nil {
         fmt.Printf("Unable to connect: %s\n", err.Error())
         t.FailNow()
     }
 
-    if !client.Connected() {
+    if !ep.Connected() {
         fmt.Printf("Hello not set correctly\n")
         t.FailNow()
     }
