@@ -45,6 +45,9 @@ type reader struct {
     expected [][]byte
     got int
     *testing.T
+
+    expectedMessages [][]byte
+    messages int
 }
 
 func makeReader(t *testing.T) *reader {
@@ -53,11 +56,18 @@ func makeReader(t *testing.T) *reader {
     r.expected = make([][]byte, 0, 5)
     r.T = t
 
+    r.expectedMessages = make([][]byte, 0, 5)
+    r.messages = 0
+
     return r
 }
 
 func (r *reader) addExpected(expected []byte) {
     r.expected = append(r.expected, expected)
+}
+
+func (r *reader) addMessage(message []byte) {
+    r.expectedMessages = append(r.expectedMessages, message)
 }
 
 func (r *reader) Data(messageType byte, data []byte) {
@@ -67,6 +77,14 @@ func (r *reader) Data(messageType byte, data []byte) {
         r.got++
     } else {
         r.T.Error(data, " != ", r.expected[r.got])
+    }
+}
+
+func (r* reader) Message(messageType byte, data []byte) {
+    if slicesEqual(data, r.expectedMessages[r.messages]) {
+        r.messages++
+    } else {
+        r.T.Error(data, " != ", r.expectedMessages[r.messages])
     }
 }
 
@@ -93,10 +111,12 @@ func TestHello(t *testing.T) {
 
     short := []byte{0, 1, 2, 3}
     long := makeLong()
+    message := []byte("{\"a\" : 5}")
 
     serverRead := makeReader(t)
     serverRead.addExpected(short)
     serverRead.addExpected(long)
+    serverRead.addMessage(message)
 
     go func () {
         fmt.Printf("Starting server\n")
@@ -125,12 +145,19 @@ func TestHello(t *testing.T) {
     ep.WriteBytes(long)
     sleep()
 
-    ep.WriteMessage(json, []byte("{\"a\" : 5}"))
+    ep.WriteMessage(json, message)
 
     sleep()
 
     if serverRead.got != len(serverRead.expected) {
-        t.Errorf("Expected %d messages, got %d\n", len(serverRead.expected),
+        t.Errorf("Expected %d byte messages, got %d\n",
+            len(serverRead.expected),
             serverRead.got)
+    }
+
+    if serverRead.messages != len(serverRead.expectedMessages) {
+        t.Errorf("Expected %d text messages, got %d\n",
+            len(serverRead.expectedMessages),
+            serverRead.messages)
     }
 }

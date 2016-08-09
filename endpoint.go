@@ -17,6 +17,7 @@ type ConnectionHandler interface {
 
 type ReadData interface {
     Data(messageType byte, data []byte)
+    Message(messageType byte, data []byte)
 }
 
 const (
@@ -95,6 +96,8 @@ func (ep *Endpoint) readRoutine(read ReadData) {
                 fmt.Printf("Packet length: %d\n", length)
                 if data[0] == longBytes {
                     read.Data(data[0], data[3:3+length])
+                } else {
+                    read.Message(data[0], data[3:3+length])
                 }
         }
     }
@@ -166,29 +169,33 @@ func (ep* Endpoint) Close() {
     ep.connection.Close()
 }
 
-func (ep* Endpoint) WriteBytes(data []byte) {
+func (ep* Endpoint) writeLongMessage(messageType byte, data []byte, length int) {
+    towrite := make([]byte, 3, length + 3)
+    towrite[0] = messageType
 
-    var towrite []byte
+    buffer := new(bytes.Buffer)
+    binary.Write(buffer, binary.BigEndian, uint16(length))
+    copy(towrite[1:3], buffer.Bytes())
+    towrite = append(towrite, data...)
+    ep.connection.Write(towrite)
+}
+
+func (ep* Endpoint) WriteBytes(data []byte) {
 
     length := len(data)
 
     if length <= 255 {
-        towrite = make([]byte, 2, length + 2)
+        towrite := make([]byte, 2, length + 2)
         towrite[0] = shortBytes
         towrite[1] = byte(len(data))
         towrite = append(towrite, data...)
+        ep.connection.Write(towrite)
     } else {
-        towrite = make([]byte, 3, length + 3)
-        towrite[0] = longBytes
-
-        buffer := new(bytes.Buffer)
-        binary.Write(buffer, binary.BigEndian, uint16(length))
-        copy(towrite[1:3], buffer.Bytes())
-        towrite = append(towrite, data...)
+        ep.writeLongMessage(longBytes, data, length)
     }
 
-    ep.connection.Write(towrite)
 }
 
 func (ep* Endpoint) WriteMessage(messageType byte, data []byte) {
+    ep.writeLongMessage(messageType, data, len(data))
 }
