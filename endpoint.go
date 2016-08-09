@@ -42,7 +42,6 @@ func Listen(
     }
 
     for true {
-        fmt.Printf("Accepting new connection\n")
         conn, err := listener.Accept()
 
         if err != nil {
@@ -50,8 +49,6 @@ func Listen(
             listener.Close()
             return
         }
-
-        fmt.Printf("Accepted connection\n")
 
         ep := new(Endpoint)
         ep.connection = conn
@@ -63,11 +60,72 @@ func Listen(
 }
 
 func (ep *Endpoint) startReader(read ReadData) {
-    go ep.readRoutine(read)
+    go ep.readPacket(read)
+}
+
+func (ep *Endpoint) readPacket(read ReadData) {
+
+    for true {
+        ep.connection.SetDeadline(time.Now().Add(time.Second * 5))
+        var length uint16
+        message, err := ep.readBytes(1)
+
+        if err != nil {
+            break
+        }
+
+        switch message[0] {
+            case hello:
+                data := []byte{ok}
+                ep.connection.Write(data[0:1])
+                continue
+            case ok:
+                continue
+            case shortBytes:
+                lengthBytes, err := ep.readBytes(1)
+                length = uint16(lengthBytes[0])
+
+                if err != nil {
+                    break
+                }
+            default:
+                lengthBytes, err := ep.readBytes(2)
+                buffer := bytes.NewBuffer(lengthBytes)
+                binary.Read(buffer, binary.BigEndian, &length)
+
+                if err != nil {
+                    break
+                }
+        }
+
+        data, err := ep.readBytes(int(length))
+
+        if err != nil {
+            break
+        }
+
+        switch message[0] {
+            case shortBytes:
+            fallthrough
+            case longBytes:
+            read.Data(message[0], data)
+
+            default:
+            read.Message(message[0], data)
+        }
+
+    }
+}
+
+func (ep *Endpoint) readBytes(length int) ([]byte, error) {
+    data := make([]byte, length)
+
+    n, err := ep.connection.Read(data)
+
+    return data[0:n], err
 }
 
 func (ep *Endpoint) readRoutine(read ReadData) {
-    fmt.Printf("Starting reader\n")
     conn := ep.connection
 
     data := make([]byte, 2056)
@@ -75,12 +133,11 @@ func (ep *Endpoint) readRoutine(read ReadData) {
     var err error
 
     for {
-        n, err := conn.Read(data);
+        _, err := conn.Read(data);
         if err != nil {
             fmt.Printf("Error reading: %s\n", err.Error())
             break
         }
-        fmt.Printf("Read %d bytes\n", n)
         switch data[0] {
             case hello:
                 data[0] = ok
@@ -93,7 +150,6 @@ func (ep *Endpoint) readRoutine(read ReadData) {
                 var length uint16
                 buffer := bytes.NewBuffer(data[1:3])
                 binary.Read(buffer, binary.BigEndian, &length)
-                fmt.Printf("Packet length: %d\n", length)
                 if data[0] == longBytes {
                     read.Data(data[0], data[3:3+length])
                 } else {
@@ -112,15 +168,12 @@ func Connect(
     address string,
     read ReadData) (*Endpoint, error) {
 
-    fmt.Printf("Dialing\n")
     conn, err := net.Dial(protocol, address)
 
     if err != nil {
         fmt.Printf("Error dialing: %s\n", err.Error())
         return nil, err
     }
-
-    fmt.Printf("Accepted\n")
 
     ep := new(Endpoint)
 
@@ -137,7 +190,6 @@ func (ep *Endpoint) hello() error {
 
     conn := ep.connection
 
-    fmt.Printf("Writing hello\n")
     data := [1]byte{hello}
 
     conn.SetDeadline(time.Now().Add(time.Second * 5))

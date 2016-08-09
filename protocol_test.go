@@ -38,7 +38,6 @@ func slicesEqual(a []byte, b []byte) bool {
 }
 
 func (h *handler) Connection(ep *fb.Endpoint) {
-    fmt.Printf("Started handler\n")
 }
 
 type reader struct {
@@ -71,8 +70,6 @@ func (r *reader) addMessage(message []byte) {
 }
 
 func (r *reader) Data(messageType byte, data []byte) {
-    fmt.Printf("Got message: %d\n", messageType)
-
     if r.got >= len(r.expected) {
         r.T.Error("Too many byte messages")
         return
@@ -129,13 +126,11 @@ func TestHello(t *testing.T) {
     serverRead.addMessage(message)
 
     go func () {
-        fmt.Printf("Starting server\n")
         fb.Listen("tcp", address, new(handler), serverRead)
     }()
 
     sleep()
 
-    fmt.Printf("Connecting\n")
     ep, err := fb.Connect("tcp", address, new(reader))
 
     defer ep.Close()
