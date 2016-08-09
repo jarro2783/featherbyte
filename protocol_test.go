@@ -44,12 +44,14 @@ func (h *handler) Connection(ep *fb.Endpoint) {
 type reader struct {
     expected [][]byte
     got int
+    *testing.T
 }
 
-func makeReader() *reader {
+func makeReader(t *testing.T) *reader {
     r := new(reader)
     r.got = 0
     r.expected = make([][]byte, 0, 5)
+    r.T = t
 
     return r
 }
@@ -63,6 +65,8 @@ func (r *reader) Data(messageType byte, data []byte) {
 
     if slicesEqual(data, r.expected[r.got]) {
         r.got++
+    } else {
+        r.T.Error(data, " != ", r.expected[r.got])
     }
 }
 
@@ -90,7 +94,7 @@ func TestHello(t *testing.T) {
     short := []byte{0, 1, 2, 3}
     long := makeLong()
 
-    serverRead := makeReader()
+    serverRead := makeReader(t)
     serverRead.addExpected(short)
     serverRead.addExpected(long)
 
@@ -117,13 +121,16 @@ func TestHello(t *testing.T) {
     }
 
     ep.WriteBytes(short)
+    sleep()
     ep.WriteBytes(long)
+    sleep()
 
     ep.WriteMessage(json, []byte("{\"a\" : 5}"))
 
+    sleep()
+
     if serverRead.got != len(serverRead.expected) {
-        fmt.Printf("Expected %d messages, got %d\n", len(serverRead.expected),
+        t.Errorf("Expected %d messages, got %d\n", len(serverRead.expected),
             serverRead.got)
-        t.FailNow()
     }
 }

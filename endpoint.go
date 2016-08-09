@@ -1,5 +1,7 @@
 package featherbyte
 
+import "encoding/binary"
+import "bytes"
 import "fmt"
 import "net"
 import "time"
@@ -67,7 +69,7 @@ func (ep *Endpoint) readRoutine(read ReadData) {
     fmt.Printf("Starting reader\n")
     conn := ep.connection
 
-    data := make([]byte, 1024)
+    data := make([]byte, 2056)
 
     var err error
 
@@ -82,8 +84,18 @@ func (ep *Endpoint) readRoutine(read ReadData) {
             case hello:
                 data[0] = ok
                 conn.Write(data[0:1])
+            case shortBytes:
+                length := data[1]
+                read.Data(data[0], data[2:2+length])
+            //longBytes and other messages are the same
             default:
-                read.Data(data[0], data[1:n])
+                var length uint16
+                buffer := bytes.NewBuffer(data[1:3])
+                binary.Read(buffer, binary.BigEndian, &length)
+                fmt.Printf("Packet length: %d\n", length)
+                if data[0] == longBytes {
+                    read.Data(data[0], data[3:3+length])
+                }
         }
     }
 
@@ -155,6 +167,27 @@ func (ep* Endpoint) Close() {
 }
 
 func (ep* Endpoint) WriteBytes(data []byte) {
+
+    var towrite []byte
+
+    length := len(data)
+
+    if length <= 255 {
+        towrite = make([]byte, 2, length + 2)
+        towrite[0] = shortBytes
+        towrite[1] = byte(len(data))
+        towrite = append(towrite, data...)
+    } else {
+        towrite = make([]byte, 3, length + 3)
+        towrite[0] = longBytes
+
+        buffer := new(bytes.Buffer)
+        binary.Write(buffer, binary.BigEndian, uint16(length))
+        copy(towrite[1:3], buffer.Bytes())
+        towrite = append(towrite, data...)
+    }
+
+    ep.connection.Write(towrite)
 }
 
 func (ep* Endpoint) WriteMessage(messageType byte, data []byte) {
