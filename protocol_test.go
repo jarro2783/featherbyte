@@ -73,6 +73,11 @@ func (r *reader) addMessage(message []byte) {
 func (r *reader) Data(messageType byte, data []byte) {
     fmt.Printf("Got message: %d\n", messageType)
 
+    if r.got >= len(r.expected) {
+        r.T.Error("Too many byte messages")
+        return
+    }
+
     if slicesEqual(data, r.expected[r.got]) {
         r.got++
     } else {
@@ -81,6 +86,11 @@ func (r *reader) Data(messageType byte, data []byte) {
 }
 
 func (r* reader) Message(messageType byte, data []byte) {
+
+    if r.messages >= len(r.expectedMessages) {
+        r.T.Error("Too many messages")
+    }
+
     if slicesEqual(data, r.expectedMessages[r.messages]) {
         r.messages++
     } else {
