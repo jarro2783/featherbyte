@@ -66,11 +66,24 @@ func (ep *Endpoint) startReader(read ReadData) {
 func (ep *Endpoint) readPacket(read ReadData) {
 
     for true {
-        ep.connection.SetDeadline(time.Now().Add(time.Second * 5))
+        //ep.connection.SetReadDeadline(time.Now().Add(time.Second * 5))
         var length uint16
         message, err := ep.readBytes(1)
 
         if err != nil {
+            switch e := err.(type) {
+            case net.Error:
+                if e.Timeout() {
+                    fmt.Printf("Read timedout\n")
+                    continue
+                }
+            default:
+                break
+            }
+        }
+
+        if len(message) > 0 {
+        } else {
             break
         }
 
@@ -193,6 +206,8 @@ func (ep *Endpoint) hello() error {
     data := [1]byte{hello}
 
     conn.SetDeadline(time.Now().Add(time.Second * 5))
+
+    defer conn.SetDeadline(time.Time{})
     _, err := conn.Write(data[:])
 
     if err != nil {
