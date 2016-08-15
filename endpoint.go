@@ -32,8 +32,7 @@ const (
 func Listen(
     protocol string,
     address string,
-    handler ConnectionHandler,
-    read ReadData) {
+    handler ConnectionHandler) {
     listener, err := net.Listen(protocol, address)
 
     if err != nil {
@@ -53,13 +52,11 @@ func Listen(
         ep := new(Endpoint)
         ep.connection = conn
 
-        ep.startReader(read)
-
         go handler.Connection(ep)
     }
 }
 
-func (ep *Endpoint) startReader(read ReadData) {
+func (ep *Endpoint) StartReader(read ReadData) {
     go ep.readPacket(read)
 }
 
@@ -194,7 +191,7 @@ func Connect(
 
     err = ep.hello()
 
-    ep.startReader(read)
+    ep.StartReader(read)
 
     return ep, err
 }

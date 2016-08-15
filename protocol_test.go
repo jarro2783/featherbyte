@@ -21,6 +21,7 @@ const (
 )
 
 type handler struct {
+    *reader
 }
 
 func slicesEqual(a []byte, b []byte) bool {
@@ -37,7 +38,14 @@ func slicesEqual(a []byte, b []byte) bool {
     return true
 }
 
+func makeHandler(r *reader) *handler {
+    h := new(handler)
+    h.reader = r
+    return h
+}
+
 func (h *handler) Connection(ep *fb.Endpoint) {
+    ep.StartReader(h.reader)
 }
 
 type reader struct {
@@ -126,7 +134,7 @@ func TestHello(t *testing.T) {
     serverRead.addMessage(message)
 
     go func () {
-        fb.Listen("tcp", address, new(handler), serverRead)
+        fb.Listen("tcp", address, makeHandler(serverRead))
     }()
 
     sleep()
