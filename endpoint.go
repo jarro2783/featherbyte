@@ -18,6 +18,7 @@ type ConnectionHandler interface {
 type ReadData interface {
     Data(messageType byte, data []byte)
     Message(messageType byte, data []byte)
+    Exiting()
 }
 
 const (
@@ -62,6 +63,7 @@ func (ep *Endpoint) StartReader(read ReadData) {
 
 func (ep *Endpoint) readPacket(read ReadData) {
 
+    Loop:
     for true {
         //ep.connection.SetReadDeadline(time.Now().Add(time.Second * 5))
         var length uint16
@@ -75,7 +77,7 @@ func (ep *Endpoint) readPacket(read ReadData) {
                     continue
                 }
             default:
-                break
+                break Loop
             }
         }
 
@@ -104,7 +106,7 @@ func (ep *Endpoint) readPacket(read ReadData) {
                 binary.Read(buffer, binary.BigEndian, &length)
 
                 if err != nil {
-                    break
+                    break Loop
                 }
         }
 
@@ -125,6 +127,9 @@ func (ep *Endpoint) readPacket(read ReadData) {
         }
 
     }
+
+    fmt.Printf("Exiting reader\n")
+    read.Exiting()
 }
 
 func (ep *Endpoint) readBytes(length int) ([]byte, error) {
@@ -233,7 +238,10 @@ func (ep* Endpoint) Close() {
     ep.connection.Close()
 }
 
-func (ep* Endpoint) writeLongMessage(messageType byte, data []byte, length int) {
+func (ep* Endpoint) writeLongMessage(
+    messageType byte,
+    data []byte,
+    length int) error {
     towrite := make([]byte, 3, length + 3)
     towrite[0] = messageType
 
@@ -241,25 +249,30 @@ func (ep* Endpoint) writeLongMessage(messageType byte, data []byte, length int) 
     binary.Write(buffer, binary.BigEndian, uint16(length))
     copy(towrite[1:3], buffer.Bytes())
     towrite = append(towrite, data...)
-    ep.connection.Write(towrite)
+    _, err := ep.connection.Write(towrite)
+
+    return err
 }
 
-func (ep* Endpoint) WriteBytes(data []byte) {
+func (ep* Endpoint) WriteBytes(data []byte) error {
 
     length := len(data)
+
+    var err error
 
     if length <= 255 {
         towrite := make([]byte, 2, length + 2)
         towrite[0] = shortBytes
         towrite[1] = byte(len(data))
         towrite = append(towrite, data...)
-        ep.connection.Write(towrite)
+        _, err = ep.connection.Write(towrite)
     } else {
-        ep.writeLongMessage(longBytes, data, length)
+        err = ep.writeLongMessage(longBytes, data, length)
     }
 
+    return err
 }
 
-func (ep* Endpoint) WriteMessage(messageType byte, data []byte) {
-    ep.writeLongMessage(messageType, data, len(data))
+func (ep* Endpoint) WriteMessage(messageType byte, data []byte) error {
+    return ep.writeLongMessage(messageType, data, len(data))
 }
