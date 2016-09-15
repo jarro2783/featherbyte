@@ -103,6 +103,9 @@ func (r* reader) Message(messageType byte, data []byte) {
     }
 }
 
+func (r* reader) Exiting() {
+}
+
 func makeAddress() string {
     return "localhost:34123"
 }
