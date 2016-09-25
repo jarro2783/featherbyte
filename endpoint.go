@@ -33,21 +33,19 @@ const (
 func Listen(
     protocol string,
     address string,
-    handler ConnectionHandler) {
+    handler ConnectionHandler) error {
     listener, err := net.Listen(protocol, address)
 
     if err != nil {
-        fmt.Printf("Unable to listen: %s\n", err.Error())
-        return
+        return err
     }
 
     for true {
         conn, err := listener.Accept()
 
         if err != nil {
-            fmt.Printf("Error accepting: %s\n", err.Error())
             listener.Close()
-            return
+            return err
         }
 
         ep := new(Endpoint)
@@ -55,6 +53,8 @@ func Listen(
 
         go handler.Connection(ep)
     }
+
+    return nil
 }
 
 func (ep *Endpoint) StartReader(read ReadData) {
@@ -128,7 +128,6 @@ func (ep *Endpoint) readPacket(read ReadData) {
 
     }
 
-    fmt.Printf("Exiting reader\n")
     read.Exiting()
 }
 
@@ -145,12 +144,9 @@ func (ep *Endpoint) readRoutine(read ReadData) {
 
     data := make([]byte, 2056)
 
-    var err error
-
     for {
         _, err := conn.Read(data);
         if err != nil {
-            fmt.Printf("Error reading: %s\n", err.Error())
             break
         }
         switch data[0] {
@@ -172,10 +168,6 @@ func (ep *Endpoint) readRoutine(read ReadData) {
                 }
         }
     }
-
-    if err != nil {
-        fmt.Printf("Error reading: %s\n", err.Error())
-    }
 }
 
 func Connect(
@@ -186,7 +178,6 @@ func Connect(
     conn, err := net.Dial(protocol, address)
 
     if err != nil {
-        fmt.Printf("Error dialing: %s\n", err.Error())
         return nil, err
     }
 
@@ -213,7 +204,6 @@ func (ep *Endpoint) hello() error {
     _, err := conn.Write(data[:])
 
     if err != nil {
-        fmt.Printf("Error writing hello: %s\n", err.Error())
         return err
     }
 
